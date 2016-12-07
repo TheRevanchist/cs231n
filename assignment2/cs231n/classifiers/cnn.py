@@ -18,7 +18,7 @@ class ThreeLayerConvNet(object):
   
   def __init__(self, input_dim=(3, 32, 32), num_filters=32, filter_size=7,
                hidden_dim=100, num_classes=10, weight_scale=1e-3, reg=0.0,
-               dtype=np.float32):
+               dtype=np.float32, use_batchnorm=True):
     """
     Initialize a new network.
     
@@ -36,6 +36,8 @@ class ThreeLayerConvNet(object):
     self.params = {}
     self.reg = reg
     self.dtype = dtype
+    self.use_batchnorm = use_batchnorm
+    self.bn_params = {}
     
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
@@ -47,10 +49,66 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
-    pass
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
+    C, H, W = input_dim
+    
+    # initialization for the convolutional layer
+    F = num_filters
+    filter_height = filter_size
+    filter_width = filter_size
+    stride_conv = 1
+    pad = (filter_size - 1)/2
+    Hc = 1 + (H + 2 * pad - filter_height)/stride_conv
+    Wc = 1 + (W + 2 * pad - filter_width)/stride_conv
+    
+    W1 = weight_scale * np.random.randn(F, C, filter_height, filter_width)
+    b1 = np.zeros(F)
+    
+    # initialization for the pooling layer
+    width_pool = 2
+    height_pool = 2
+    stride_pool = 2
+    Hp = 1 + (Hc - height_pool)/stride_pool
+    Wp = 1 + (Wc - width_pool)/stride_pool
+    
+    # initialization for the fully connected (ReLU) layer
+    Hh = hidden_dim
+    W2 = weight_scale * np.random.randn(F * Hp * Wp, Hh)
+    b2 = np.zeros(Hh)
+    
+    # initialization for the softmax layer
+    Hc = num_classes
+    W3 = weight_scale * np.random.randn(Hh, Hc)
+    b3 = np.zeros(Hc)
+    
+    # store the values into the dictionary
+    self.params['W1'] = W1
+    self.params['W2'] = W2
+    self.params['W3'] = W3
+    self.params['b1'] = b1
+    self.params['b2'] = b2
+    self.params['b3'] = b3
+    
+    if self.use_batchnorm:
+      print 'We use batchnorm here'
+      bn_param1 = {'mode': 'train',
+                   'running_mean': np.zeros(F),
+                   'running_var': np.zeros(F)}
+      gamma1 = np.ones(F)
+      beta1 = np.zeros(F)
+
+      bn_param2 = {'mode': 'train',
+                   'running_mean': np.zeros(Hh),
+                   'running_var': np.zeros(Hh)}
+      gamma2 = np.ones(Hh)
+      beta2 = np.zeros(Hh)
+
+      self.bn_params.update({'bn_param1': bn_param1,
+                             'bn_param2': bn_param2})
+
+      self.params.update({'beta1': beta1,
+                          'beta2': beta2,
+                          'gamma1': gamma1,
+                          'gamma2': gamma2})
 
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(dtype)
@@ -62,9 +120,25 @@ class ThreeLayerConvNet(object):
     
     Input / output: Same API as TwoLayerNet in fc_net.py.
     """
+    
+    X = X.astype(self.dtype)
+    mode = 'test' if y is None else 'train'
+
+    if self.use_batchnorm:
+      for key, bn_param in self.bn_params.iteritems():
+        bn_param[mode] = mode
+
+    N = X.shape[0] 
+    
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
+
+    if self.use_batchnorm:
+      bn_param1, gamma1, beta1 = self.bn_params[
+        'bn_param1'], self.params['gamma1'], self.params['beta1']
+      bn_param2, gamma2, beta2 = self.bn_params[
+        'bn_param2'], self.params['gamma2'], self.params['beta2']
     
     # pass conv_param to the forward pass for the convolutional layer
     filter_size = W1.shape[2]
@@ -74,32 +148,67 @@ class ThreeLayerConvNet(object):
     pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
 
     scores = None
-    ############################################################################
-    # TODO: Implement the forward pass for the three-layer convolutional net,  #
-    # computing the class scores for X and storing them in the scores          #
-    # variable.                                                                #
-    ############################################################################
-    pass
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
+    
+    # forward stage into the conv layer
+    if self.use_batchnorm:
+      conv_layer, cache_conv_layer = conv_norm_relu_pool_forward(
+        X, W1, b1, conv_param, pool_param, gamma1, beta1, bn_param1)
+    else:
+      conv_layer, cache_conv_layer = conv_relu_pool_forward(X, W1, b1, \
+        conv_param, pool_param)
+    
+    # forward stage for the fully connected layer
+    N, F, Hp, Wp = conv_layer.shape
+    conv_layer_reshaped = conv_layer.reshape((N, F * Hp * Wp)) 
+    
+    if self.use_batchnorm:
+      hidden_layer, cache_hidden_layer = affine_norm_relu_forward(conv_layer_reshaped, \
+        W2, b2, gamma2, beta2, bn_param2)
+    else:
+      hidden_layer, cache_hidden_layer = affine_relu_forward(conv_layer_reshaped, \
+        W2, b2)
+        
+    # forward stage for the output (softmax) layer
+    scores, cache_scores = affine_forward(hidden_layer, W3, b3)    
     
     if y is None:
       return scores
     
     loss, grads = 0, {}
-    ############################################################################
-    # TODO: Implement the backward pass for the three-layer convolutional net, #
-    # storing the loss and gradients in the loss and grads variables. Compute  #
-    # data loss using softmax, and make sure that grads[k] holds the gradients #
-    # for self.params[k]. Don't forget to add L2 regularization!               #
-    ############################################################################
-    pass
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
     
+    # compute the cost (loss function)
+    data_loss, dscores = svm_loss(scores, y)
+    reg_loss = 0.5 * self.reg * np.sum(W1 ** 2)
+    reg_loss += 0.5 * self.reg * np.sum(W2 ** 2)
+    reg_loss += 0.5 * self.reg * np.sum(W3 ** 2)
+    loss = data_loss + reg_loss
+    
+    # back-prop into the output layer
+    dX3, dW3, db3 = affine_backward(dscores, cache_scores)
+    dW3 += self.reg * W3
+    
+    # back-prop into the fully connected layer
+    if self.use_batchnorm:
+      dX2, dW2, db2, dgamma2, dbeta2 = affine_norm_relu_backward(dX3, cache_hidden_layer)
+    else:
+      dX2, dW2, db2 = affine_relu_backward(dX3, cache_hidden_layer)
+    dW2 += self.reg * W2  
+      
+    # back-prop into the convolutional layer
+    dX2 = dX2.reshape(N, F, Hp, Wp)  
+    if self.use_batchnorm:
+      dX1, dW1, db1, dgamma1, dbeta1 = conv_norm_relu_pool_backward(
+                dX2, cache_conv_layer)
+    else:
+      dX1, dW1, db1 = conv_relu_pool_backward(dX2, cache_conv_layer)  
+    dW1 += self.reg * W1          
+
+    grads.update({'W1': dW1, 'b1': db1, 'W2': dW2, 'b2': db2, 'W3': dW3, 'b3': db3})
+
+    if self.use_batchnorm:
+      grads.update({'beta1': dbeta1,
+                    'beta2': dbeta2,
+                    'gamma1': dgamma1,
+                    'gamma2': dgamma2})  
+                    
     return loss, grads
-  
-  
-pass
