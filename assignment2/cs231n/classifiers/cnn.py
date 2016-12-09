@@ -4,7 +4,6 @@ from cs231n.layers import *
 from cs231n.fast_layers import *
 from cs231n.layer_utils import *
 
-
 class ThreeLayerConvNet(object):
   """
   A three-layer convolutional network with the following architecture:
@@ -16,7 +15,7 @@ class ThreeLayerConvNet(object):
   channels.
   """
   
-  def __init__(self, input_dim=(3, 32, 32), num_filters=32, filter_size=7,
+  def __init__(self, input_dim=(3, 32, 32), num_filters=64, filter_size=3,
                hidden_dim=100, num_classes=10, weight_scale=1e-3, reg=0.0,
                dtype=np.float32, use_batchnorm=True):
     """
@@ -39,16 +38,7 @@ class ThreeLayerConvNet(object):
     self.use_batchnorm = use_batchnorm
     self.bn_params = {}
     
-    ############################################################################
-    # TODO: Initialize weights and biases for the three-layer convolutional    #
-    # network. Weights should be initialized from a Gaussian with standard     #
-    # deviation equal to weight_scale; biases should be initialized to zero.   #
-    # All weights and biases should be stored in the dictionary self.params.   #
-    # Store weights and biases for the convolutional layer using the keys 'W1' #
-    # and 'b1'; use keys 'W2' and 'b2' for the weights and biases of the       #
-    # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
-    # of the output affine layer.                                              #
-    ############################################################################
+    # initialize the weights for all layers
     C, H, W = input_dim
     
     # initialization for the convolutional layer
@@ -112,7 +102,7 @@ class ThreeLayerConvNet(object):
 
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(dtype)
-     
+
  
   def loss(self, X, y=None):
     """
@@ -130,6 +120,7 @@ class ThreeLayerConvNet(object):
 
     N = X.shape[0] 
     
+    # unpack the weight and the biases
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
@@ -177,7 +168,7 @@ class ThreeLayerConvNet(object):
     loss, grads = 0, {}
     
     # compute the cost (loss function)
-    data_loss, dscores = svm_loss(scores, y)
+    data_loss, dscores = softmax_loss(scores, y)
     reg_loss = 0.5 * self.reg * np.sum(W1 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W2 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W3 ** 2)
