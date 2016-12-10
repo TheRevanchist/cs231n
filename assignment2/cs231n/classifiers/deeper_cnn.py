@@ -53,7 +53,9 @@ class DeeperCNN(object):
     Wc1 = 1 + (W - filter_width1 + 2 * pad1)/stride_conv1 
 
     # initialize the weights and biases in the first layer
-    W1 = weight_scale * np.random.randn(F1, C, filter_height1, filter_width1)
+    # W1 = weight_scale * np.random.randn(F1, C, filter_height1, filter_width1)
+    W1 = np.random.randn(F1, C, filter_height1, filter_width1) \
+      * np.sqrt(2.0/(C * filter_height1 * filter_width1 * F1)) 
     b1 = np.zeros(F1)    
 
     # compute the values for the first pooling layer
@@ -70,7 +72,9 @@ class DeeperCNN(object):
     Wc2 = 1 + (Wp1 - filter_width2 + 2 * pad2) / stride_conv2 
 
     # initialize the weights and biases in the second layer
-    W2 = weight_scale * np.random.randn(F2, F1, filter_height2, filter_width2)
+    #W2 = weight_scale * np.random.randn(F2, F1, filter_height2, filter_width2)
+    W2 = np.random.randn(F2, F1, filter_height2, filter_width2) \
+      * np.sqrt(2.0/(F1 * filter_height2 * filter_width2 * F2))     
     b2 = np.zeros(F2)
 
     # compute the values for the second pooling layer
@@ -87,7 +91,9 @@ class DeeperCNN(object):
     Wc3 = 1 + (Wp2 - filter_width3 + 2 * pad3) / stride_conv3 
 
     # initialize the weights and biases in the third layer
-    W3 = weight_scale * np.random.randn(F3, F2, filter_height3, filter_width3)
+    #W3 = weight_scale * np.random.randn(F3, F2, filter_height3, filter_width3)
+    W3 = np.random.randn(F3, F2, filter_height3, filter_width3) \
+      * np.sqrt(2.0/(F2 * filter_height3 * filter_width3 * F3))     
     b3 = np.zeros(F3)    
 
     # compute the values for the third pooling layer
@@ -97,12 +103,12 @@ class DeeperCNN(object):
 
     # initialization for the fully connected (ReLU) layer
     Hh = hidden_dim
-    W4 = weight_scale * np.random.randn(F3 * Hp3 * Wp3, Hh)
+    W4 = np.random.randn(F3 * Hp3 * Wp3, Hh) * np.sqrt(2.0/(F3 * Hp3 * Wp3 * Hh))
     b4 = np.zeros(Hh) 
 
     # initialization for the output layer
     Hc = num_classes
-    W5 = weight_scale * np.random.randn(Hh, Hc)
+    W5 = np.random.randn(Hh, Hc) * np.sqrt(2.0/(Hh * Hc))
     b5 = np.zeros(Hc) 
     
     # store some values as fields (in order to synchronize better with the

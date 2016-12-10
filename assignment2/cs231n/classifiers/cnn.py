@@ -50,7 +50,9 @@ class ThreeLayerConvNet(object):
     Hc = 1 + (H + 2 * pad - filter_height)/stride_conv
     Wc = 1 + (W + 2 * pad - filter_width)/stride_conv
     
-    W1 = weight_scale * np.random.randn(F, C, filter_height, filter_width)
+    #W1 = weight_scale * np.random.randn(F, C, filter_height, filter_width)
+    W1 = np.random.randn(F, C, filter_height, filter_width) \
+      * np.sqrt(2.0/(C * filter_height * filter_width))   
     b1 = np.zeros(F)
     
     # initialization for the pooling layer
@@ -62,12 +64,14 @@ class ThreeLayerConvNet(object):
     
     # initialization for the fully connected (ReLU) layer
     Hh = hidden_dim
-    W2 = weight_scale * np.random.randn(F * Hp * Wp, Hh)
+    #W2 = weight_scale * np.random.randn(F * Hp * Wp, Hh)
+    W2 = np.random.randn(F * Hp * Wp, Hh) * np.sqrt(2.0/(F * Hp * Wp)) 
     b2 = np.zeros(Hh)
     
     # initialization for the softmax layer
     Hc = num_classes
-    W3 = weight_scale * np.random.randn(Hh, Hc)
+    #W3 = weight_scale * np.random.randn(Hh, Hc)
+    W3 = np.random.randn(Hh, Hc) * np.sqrt(2.0/(Hh))
     b3 = np.zeros(Hc)
     
     # store the values into the dictionary

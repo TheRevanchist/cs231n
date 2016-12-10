@@ -90,7 +90,7 @@ def conv_relu_backward(dout, cache):
   
 def conv_norm_relu_forward(x, w, b, conv_param, gamma, beta, bn_param):
   """Convenience layer that performs a convolution, spatial
-  batchnorm, a ReLU, and a pool.
+  batchnorm, a ReLU.
   Inputs:
   - x: Input to the convolutional layer
   - w, b, conv_param: Weights and parameters for the convolutional layer
@@ -145,6 +145,8 @@ def conv_relu_pool_backward(dout, cache):
   da = relu_backward(ds, relu_cache)
   dx, dw, db = conv_backward_fast(da, conv_cache)
   return dx, dw, db
+  
+  
   
 def conv_norm_relu_pool_forward(x, w, b, conv_param, pool_param, gamma, beta, bn_param):
   """Convenience layer that performs a convolution, spatial
