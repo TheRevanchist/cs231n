@@ -4,7 +4,7 @@ from cs231n.layers import *
 from cs231n.fast_layers import *
 from cs231n.layer_utils import *
 
-class DeeperCNN(object):
+class DeeperCNN2(object):
   """ A more deeper CNN, with the following architecture
   conv - relu - max pool - conv - relu - max-pool - affine - relu - 
   affine - softmax/SVM
@@ -13,7 +13,7 @@ class DeeperCNN(object):
   consisting of N images, each with height H and width W and with C input 
   channels """
   
-  def __init__(self, input_dim=(3, 32, 32), num_filters=[32, 64, 128],
+  def __init__(self, input_dim=(3, 32, 32), num_filters=[32, 64, 64, 128],
                filter_size=3, hidden_dim=100, num_classes=10, 
                weight_scale=1e-3, reg=0.0, dtype=np.float32, use_batchnorm=True):
                  
@@ -96,16 +96,29 @@ class DeeperCNN(object):
     width_pool3, height_pool3, stride_pool3 = 2, 2, 2
     Hp3 = 1 + (Hc3 - height_pool3) / stride_pool3 
     Wp3 = 1 + (Wc3 - width_pool3) / stride_pool3
+    
+    # compute the information needed to initialize the weights of the fourth layer
+    filter_height4, filter_width4 = filter_size, filter_size
+    stride_conv4 = 1
+    pad4 = (filter_height4 - 1) / 2
+    F4 = num_filters[3]
+    Hc4 = 1 + (Hp3 - filter_height4 + 2 * pad4) / stride_conv4      
+    Wc4 = 1 + (Wp3 - filter_width4 + 2 * pad4) / stride_conv4
+    
+    # initialize the weights and biases in the fourth layer
+    W4 = np.random.randn(F4, F3, filter_height4, filter_width4) \
+      * np.sqrt(2.0/(F3 * filter_height4 * filter_width4 * F4))     
+    b4 = np.zeros(F4)    
 
     # initialization for the fully connected (ReLU) layer
     Hh = hidden_dim
-    W4 = np.random.randn(F3 * Hp3 * Wp3, Hh) * np.sqrt(2.0/(F3 * Hp3 * Wp3 * Hh))
-    b4 = np.zeros(Hh) 
+    W5 = np.random.randn(F4 * Hc4 * Wc4, Hh) * np.sqrt(2.0/(F4 * Hc4 * Wc4 * Hh))
+    b5 = np.zeros(Hh) 
 
     # initialization for the output layer
     Hc = num_classes
-    W5 = np.random.randn(Hh, Hc) * np.sqrt(2.0/(Hh * Hc))
-    b5 = np.zeros(Hc) 
+    W6 = np.random.randn(Hh, Hc) * np.sqrt(2.0/(Hh * Hc))
+    b6 = np.zeros(Hc) 
     
     # store some values as fields (in order to synchronize better with the
     # loss function)
@@ -125,14 +138,19 @@ class DeeperCNN(object):
     self.filter_size_pool3 = height_pool3
     self.stride_conv3 = stride_conv3
     self.stride_pool3 = stride_pool3
-    self.pad3 = pad3    
+    self.pad3 = pad3 
+    
+    self.filter_size_conv4 = filter_size
+    self.stride_conv4 = stride_conv4
+    self.pad4 = pad4
 
     # store the weights/biases into the dictionary
     self.params.update({'W1': W1, 'b1': b1,
                         'W2': W2, 'b2': b2,
                         'W3': W3, 'b3': b3,
                         'W4': W4, 'b4': b4,
-                        'W5': W5, 'b5': b5})  
+                        'W5': W5, 'b5': b5,
+                        'W6': W6, 'b6': b6})  
                         
     # store the parameters for the batchnorm into an another dictionary
     if self.use_batchnorm:
@@ -157,20 +175,28 @@ class DeeperCNN(object):
       beta3 = np.zeros(F3)
 
       bn_param4 = {'mode': 'train',
+                   'running_mean': np.zeros(F4),
+                   'running_var': np.zeros(F4)}
+      gamma4 = np.ones(F4)
+      beta4 = np.zeros(F4)
+
+      bn_param5 = {'mode': 'train',
                    'running_mean': np.zeros(Hh),
                    'running_var': np.zeros(Hh)}
-      gamma4 = np.ones(Hh)
-      beta4 = np.zeros(Hh)
+      gamma5 = np.ones(Hh)
+      beta5 = np.zeros(Hh)
 
       self.bn_params.update({'bn_param1': bn_param1,
                              'bn_param2': bn_param2,
                              'bn_param3': bn_param3,
-                             'bn_param4': bn_param4})
+                             'bn_param4': bn_param4,
+                             'bn_param5': bn_param5})
       
       self.params.update({'beta1': beta1, 'gamma1': gamma1,
                           'beta2': beta2, 'gamma2': gamma2,
                           'beta3': beta3, 'gamma3': gamma3,
-                          'beta4': beta4, 'gamma4': gamma4})
+                          'beta4': beta4, 'gamma4': gamma4,
+                          'beta5': beta5, 'gamma5': gamma5})
 
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(dtype) 
@@ -196,6 +222,7 @@ class DeeperCNN(object):
     W3, b3 = self.params['W3'], self.params['b3']
     W4, b4 = self.params['W4'], self.params['b4']
     W5, b5 = self.params['W5'], self.params['b5']
+    W6, b6 = self.params['W6'], self.params['b6']
 
     if self.use_batchnorm:
       bn_param1, gamma1, beta1 = self.bn_params[
@@ -205,12 +232,15 @@ class DeeperCNN(object):
       bn_param3, gamma3, beta3 = self.bn_params[
         'bn_param3'], self.params['gamma3'], self.params['beta3']  
       bn_param4, gamma4, beta4 = self.bn_params[
-        'bn_param4'], self.params['gamma4'], self.params['beta4']         
+        'bn_param4'], self.params['gamma4'], self.params['beta4'] 
+      bn_param5, gamma5, beta5 = self.bn_params[
+        'bn_param5'], self.params['gamma5'], self.params['beta5']       
 
     # pass conv_param to the forward pass for the convolutional layers
     conv_param1 = {'stride': self.stride_conv1, 'pad': self.pad1}
     conv_param2 = {'stride': self.stride_conv2, 'pad': self.pad2}
     conv_param3 = {'stride': self.stride_conv3, 'pad': self.pad3}
+    conv_param4 = {'stride': self.stride_conv4, 'pad': self.pad4}
     
     # pass pool_param to the forward pass for the max-pooling layers
     pool_param1 = {'pool_height': self.filter_size_pool1, \
@@ -245,20 +275,28 @@ class DeeperCNN(object):
     else:
       conv_layer3, cache_conv_layer3 = conv_relu_pool_forward(
         conv_layer2, W3, b3, conv_param3, pool_param3)
+        
+    # forward stage into the fourth conv layer
+    if self.use_batchnorm:
+      conv_layer4, cache_conv_layer4 = conv_norm_relu_forward(
+        conv_layer3, W4, b4, conv_param4, gamma4, beta4, bn_param4)
+    else:
+      conv_layer4, cache_conv_layer4 = conv_relu_forward(
+        conv_layer3, W4, b4, conv_param4)        
 
     # forward stage for the fully connected layer
-    N, F, Hp, Wp = conv_layer3.shape
-    conv_layer_reshaped = conv_layer3.reshape((N, F * Hp * Wp))     
+    N, F, Hp, Wp = conv_layer4.shape
+    conv_layer_reshaped = conv_layer4.reshape((N, F * Hp * Wp))     
 
     if self.use_batchnorm:
       hidden_layer, cache_hidden_layer = affine_norm_relu_forward(
-        conv_layer_reshaped, W4, b4, gamma4, beta4, bn_param4)
+        conv_layer_reshaped, W5, b5, gamma5, beta5, bn_param5)
     else:
       hidden_layer, cache_hidden_layer = affine_relu_forward(conv_layer_reshaped, \
-        W4, b4)    
+        W5, b5)    
 
     # forward stage for the output (softmax) layer
-    scores, cache_scores = affine_forward(hidden_layer, W5, b5)    
+    scores, cache_scores = affine_forward(hidden_layer, W6, b6)    
     
     if y is None:
       return scores
@@ -272,22 +310,31 @@ class DeeperCNN(object):
     reg_loss += 0.5 * self.reg * np.sum(W3 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W4 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W5 ** 2)
+    reg_loss += 0.5 * self.reg * np.sum(W6 ** 2)
     loss = data_loss + reg_loss    
 
     # back-prop into the output layer
-    dX5, dW5, db5 = affine_backward(dscores, cache_scores)
-    dW5 += self.reg * W5
+    dX6, dW6, db6 = affine_backward(dscores, cache_scores)
+    dW6 += self.reg * W6
 
     # back-prop into the fully connected layer
     if self.use_batchnorm:
-      dX4, dW4, db4, dgamma4, dbeta4 = affine_norm_relu_backward(
-        dX5, cache_hidden_layer)
+      dX5, dW5, db5, dgamma5, dbeta5 = affine_norm_relu_backward(
+        dX6, cache_hidden_layer)
     else:
-      dX4, dW4, db4 = affine_relu_backward(dX5, cache_hidden_layer)
-    dW4 += self.reg * W4 
+      dX5, dW5, db5 = affine_relu_backward(dX6, cache_hidden_layer)
+    dW5 += self.reg * W5 
+    
+    # back-prop into the fourth convolutional layer
+    dX5 = dX5.reshape(N, F, Hp, Wp)  
+    if self.use_batchnorm:
+      dX4, dW4, db4, dgamma4, dbeta4 = conv_norm_relu_backward(
+                dX5, cache_conv_layer4)
+    else:
+      dX4, dW4, db4 = conv_relu_backward(dX5, cache_conv_layer4)  
+    dW4 += self.reg * W4    
 
-    # back-prop into the third convolutional layer
-    dX4 = dX4.reshape(N, F, Hp, Wp)  
+    # back-prop into the third convolutional layer 
     if self.use_batchnorm:
       dX3, dW3, db3, dgamma3, dbeta3 = conv_norm_relu_pool_backward(
                 dX4, cache_conv_layer3)
@@ -315,12 +362,14 @@ class DeeperCNN(object):
                   'W2': dW2, 'b2': db2,
                   'W3': dW3, 'b3': db3,
                   'W4': dW4, 'b4': db4,
-                  'W5': dW5, 'b5': db5})  
+                  'W5': dW5, 'b5': db5,
+                  'W6': dW6, 'b6': db6})  
                   
     if self.use_batchnorm:
       grads.update({'beta1': dbeta1, 'gamma1': dgamma1,
                     'beta2': dbeta2, 'gamma2': dgamma2,
                     'beta3': dbeta3, 'gamma3': dgamma3,
-                    'beta4': dbeta4, 'gamma4': dgamma4})                  
+                    'beta4': dbeta4, 'gamma4': dgamma4,
+                    'beta5': dbeta5, 'gamma5': dgamma5})                  
     
     return loss, grads

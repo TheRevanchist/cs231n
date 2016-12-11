@@ -50,7 +50,6 @@ class ThreeLayerConvNet(object):
     Hc = 1 + (H + 2 * pad - filter_height)/stride_conv
     Wc = 1 + (W + 2 * pad - filter_width)/stride_conv
     
-    #W1 = weight_scale * np.random.randn(F, C, filter_height, filter_width)
     W1 = np.random.randn(F, C, filter_height, filter_width) \
       * np.sqrt(2.0/(C * filter_height * filter_width))   
     b1 = np.zeros(F)
@@ -64,7 +63,6 @@ class ThreeLayerConvNet(object):
     
     # initialization for the fully connected (ReLU) layer
     Hh = hidden_dim
-    #W2 = weight_scale * np.random.randn(F * Hp * Wp, Hh)
     W2 = np.random.randn(F * Hp * Wp, Hh) * np.sqrt(2.0/(F * Hp * Wp)) 
     b2 = np.zeros(Hh)
     
@@ -120,7 +118,7 @@ class ThreeLayerConvNet(object):
 
     if self.use_batchnorm:
       for key, bn_param in self.bn_params.iteritems():
-        bn_param[mode] = mode
+        bn_param[mode] = mode    
 
     N = X.shape[0] 
     
@@ -172,7 +170,7 @@ class ThreeLayerConvNet(object):
     loss, grads = 0, {}
     
     # compute the cost (loss function)
-    data_loss, dscores = softmax_loss(scores, y)
+    data_loss, dscores = svm_loss(scores, y)
     reg_loss = 0.5 * self.reg * np.sum(W1 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W2 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W3 ** 2)
