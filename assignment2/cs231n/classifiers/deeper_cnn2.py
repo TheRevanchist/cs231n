@@ -304,7 +304,7 @@ class DeeperCNN2(object):
     loss, grads = 0, {}
     
     # compute the cost (loss function)
-    data_loss, dscores = svm_loss(scores, y)
+    data_loss, dscores = softmax_loss(scores, y)
     reg_loss = 0.5 * self.reg * np.sum(W1 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W2 ** 2)
     reg_loss += 0.5 * self.reg * np.sum(W3 ** 2)
